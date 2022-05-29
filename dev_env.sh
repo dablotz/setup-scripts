@@ -53,7 +53,7 @@ function update_profile() {
   changes_made=0
   
   if [ -n ${SHELL} ]; then
-    profile="${HOME}/.${SHELL:(-3):3}_profile"
+    profile="${HOME}/.${SHELL:(-3):3}_profile" # this is not going to work is the user's default shell is longer than 3 characters - split off last occurence of backslash
   else
     profile="${HOME}/.bash_profile"
   fi
@@ -70,7 +70,7 @@ function update_profile() {
 
   if [ -z "$(grep 'export PATH' ${profile})" ]; then
     echo "Adding export PATH command to ${profile}"
-    printf "export PATH=${export_string}:\$PATH\n" >> ${profile}
+    printf "export PATH=${export_string}\$PATH\n" >> ${profile} 
     changes_made=1
   else
     if [ -z "$(grep 'pyenv root' ${profile})" ]; then
