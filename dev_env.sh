@@ -63,6 +63,8 @@ function update_profile() {
     touch ${profile}
     changes_made=1
   fi
+  
+  echo "Using ${profile} for configurations"
 
   export_string="\$(pyenv root)/shims:"
 
