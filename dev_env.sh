@@ -53,7 +53,7 @@ function update_profile() {
   changes_made=0
   
   if [ -n ${SHELL} ]; then
-    profile="${HOME}/.${SHELL:(-3):3}_profile" # this is not going to work is the user's default shell is longer than 3 characters - split off last occurence of backslash
+    profile="${HOME}/.${SHELL##*/}_profile"
   else
     profile="${HOME}/.bash_profile"
   fi
