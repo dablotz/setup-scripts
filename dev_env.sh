@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /usr/bin/env bash
 
 set -o errexit
 set -o pipefail
@@ -38,25 +38,25 @@ function install_apps() {
 #Uses pyenv to install python
 function install_python() {
   if ! pyenv >/dev/null 2>&1; then
-    if pyenv versions | grep ${python_version}; then
-      echo "python ${python_version} found. Not installing python ${python_version}"     
+    if [ -n "$(pyenv versions | grep ${python_version})" ]; then
+      echo "python ${python_version} found. Not installing python ${python_version}"
     else
       pyenv install "${python_version}"
-    fi    
+    fi
   else
     echo "pyenv unavailable"
   fi
 }
 
-# Updates the users shell profile file to include pyenv 
+# Updates the user's shell profile file to include pyenv
 function update_profile() {
-  profile=""
   changes_made=0
   
   if [ -n ${SHELL} ]; then
     profile="${HOME}/.${SHELL:(-3):3}_profile"
   else
     profile="${HOME}/.bash_profile"
+  fi
 
   if [ ! -f ${profile} ]; then
     echo "${profile} does not exist. Creating ${profile}"
@@ -86,7 +86,7 @@ function update_profile() {
     changes_made=1
   fi
 
-  if changes_made; then
+  if [ ${changes_made} ]; then
     echo "Sourcing ${profile}"
     source ${profile}
   fi
