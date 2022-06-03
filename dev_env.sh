@@ -52,13 +52,13 @@ function install_python() {
 function update_profile() {
   changes_made=0
   
-  if [ -n ${SHELL} ]; then
+  if [[ -n ${SHELL} ]]; then
     profile="${HOME}/.${SHELL##*/}_profile"
   else
     profile="${HOME}/.bash_profile"
   fi
 
-  if [ ! -f ${profile} ]; then
+  if [[ ! -f ${profile} ]]; then
     echo "${profile} does not exist. Creating ${profile}"
     touch ${profile}
     changes_made=1
@@ -67,39 +67,35 @@ function update_profile() {
   echo "Using ${profile} for configurations"
 
   export_string="\$(pyenv root)/shims:"
-
-  if [ -z "$(grep 'export PATH' ${profile})" ]; then
-    echo "Adding export PATH command to ${profile}"
-    printf "export PATH=${export_string}\$PATH\n" >> ${profile} 
-    changes_made=1
-  else
-    if [ -z "$(grep 'pyenv root' ${profile})" ]; then
-      echo "Adding ${export_string} to ${profile}"
-      sed -i.bak "s?PATH=?&${export_string}?" ${profile}
+  
+  if [[ -n ${PATH} ]]; then
+    pyenv_root=$(pyenv root)
+    
+    if [[ ! "${PATH}" =~ "${pyenv_root}/shims" ]]; then
+      echo "Adding export PATH command to ${profile}"
+      printf "export PATH=${export_string}\$PATH\n" >> ${profile} 
       changes_made=1
-    else
-      echo "export PATH command contains pyenv shims"
     fi
   fi
 
-  if [ -z "$(grep 'command -v pyenv' ${profile})" ]; then
+  if [[ -z "$(grep 'command -v pyenv' ${profile})" ]]; then
     echo "Adding pyenv snippet to ${profile}"
     printf "if command -v pyenv 1>/dev/null 2>&1; then\n  eval \"\$(pyenv init -)\"\nfi\n" >> ${profile}
     changes_made=1
   fi
 
-  if [ ${changes_made} ]; then
+  if [[ ${changes_made} > 0 ]]; then
     echo "Sourcing ${profile}"
     source ${profile}
   fi
 }
 
 function main() {
-  packages=('git' 'pyenv' 'kubectl' 'awscli@2' 'aws-iam-authenticator')
-  python_version='3.9.10'
-  check_brew
-  install_apps
-  install_python
+  #packages=('git' 'pyenv' 'kubectl' 'awscli@2' 'aws-iam-authenticator')
+  #python_version='3.9.10'
+  #check_brew
+  #install_apps
+  #install_python
   update_profile
 }
 
