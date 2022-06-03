@@ -65,12 +65,11 @@ function update_profile() {
   fi
   
   echo "Using ${profile} for configurations"
-
-  export_string="\$(pyenv root)/shims:"
   
   if [[ -n ${PATH} ]]; then
     pyenv_root=$(pyenv root)
-    
+    export_string="\$(pyenv root)/shims:"
+
     if [[ ! "${PATH}" =~ "${pyenv_root}/shims" ]]; then
       echo "Adding export PATH command to ${profile}"
       printf "export PATH=${export_string}\$PATH\n" >> ${profile} 
@@ -84,7 +83,7 @@ function update_profile() {
     changes_made=1
   fi
 
-  if [[ ${changes_made} > 0 ]]; then
+  if (( ${changes_made} )); then
     echo "Sourcing ${profile}"
     source ${profile}
   fi
