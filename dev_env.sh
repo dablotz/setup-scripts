@@ -4,7 +4,6 @@ set -o errexit
 set -o pipefail
 
 profile=""
-changes_made=0
 
 # Check if homebrew (brew) is installed
 # If yes update brew, otherwise install from the internet
@@ -27,7 +26,6 @@ function check_brew() {
 
 # Check if Java 8 and Java 11 are installed and on path
 function check_java() {
-  # If both are found, assume aliases exist??
   # can't be sure associative arrays are available so these two arrays need to match
   java_versions=('Java SE 8' 'Java SE 11')
   java_packages=('openjdk8' 'openjdk11')
@@ -45,7 +43,7 @@ function check_java() {
   done
 
   if (( ${#javas_to_install[@]} > 0 )); then
-    echo "Java packages to be installed - ${javas_to_install[@]}"
+    echo "Java binaries not found. Checking brew cellar for - ${javas_to_install[@]}"
     install_apps "${javas_to_install[@]}"
     add_java_alias "${javas_to_install[@]}"
   else
@@ -80,7 +78,7 @@ function is_outdated() {
   outdated_list=$(brew outdated)
 
   if [[ ! "${outdated_list}" =~ "${package_name}" ]]; then
-    return 1
+    return 1 # this might be the wrong way to bail if package_name is not in outdated_list
   fi
 }
 
@@ -91,6 +89,7 @@ function install_python() {
       echo "python ${python_version} found. Not installing python ${python_version}"
     else
       pyenv install "${python_version}"
+      pyenv global "${python_version}"
     fi
   else
     echo "pyenv unavailable"
@@ -108,7 +107,7 @@ function add_pyenv_to_path() {
     if [[ ! "${PATH}" =~ "${pyenv_root}/shims" ]]; then
       echo "Adding export PATH command to ${profile}"
       printf "export PATH=${export_string}\$PATH\n" >> ${profile} 
-      changes_made=1
+      source_profile
     fi
   fi
 
@@ -117,14 +116,22 @@ function add_pyenv_to_path() {
   if [[ -z "$(grep 'command -v pyenv' ${profile})" ]]; then
     echo "Adding pyenv snippet to ${profile}"
     printf "if command -v pyenv 1>/dev/null 2>&1; then\n  eval \"\$(pyenv init -)\"\nfi\n" >> ${profile}
-    changes_made=1
+    source_profile
   fi  
 }
 
 # Adds java alias to user's .{shell}_profile file
 function add_java_alias() {
-  #do the thing
-
+  javas = ("$@")
+  
+  if [[ "8" =~ javas ]]; then
+    printf "export JAVA_8_HOME=\$(/usr/libexec/java_home -v1.8)\nalias java8='export JAVA_HOME=\$JAVA_8_HOME'" >> ${profile}
+    source_profile
+  fi
+  if [[ "11" =~ javas ]]; then
+    printf "export JAVA_11_HOME=\$(/usr/libexec/java_home -v11)\nalias java11='export JAVA_HOME=\$JAVA_11_HOME'" >> ${profile}
+    source_profile
+  fi
 }
 
 # Check if a command exists
@@ -147,7 +154,7 @@ function get_user_shell_profle() {
   if [[ ! -f ${profile} ]]; then
     echo "${profile} does not exist. Creating ${profile}"
     touch ${profile}
-    changes_made=1
+    source_profile
   fi
 }
 
@@ -155,20 +162,22 @@ function get_user_shell_profle() {
 function source_profile() {
   echo "Sourcing ${profile}"
   source ${profile}
-  changes_made=0
 }
 
 function main() {
   # Command line (console) packages to install with homebrew
-  console_packages=('git' 'pyenv')
+  console_packages=('git' 'pyenv' 'maven@3.5')
   
   # Python version string - (optional) leave blank to skip install of python
   python_version='3.9.10'
   
+  # Determine the .{shell}_profile file to use for configuration (.bash_profile, .zsh_profile, etc.)
+  get_user_shell_profle
+  
   # Check on brew - install if necessary
   check_brew
 
-  # Check installed Java versions - automation requires both 8 (auto-framework) and 11 (dnp-auto-framework)
+  # Check installed Java versions for jdk 8 and jdk 11. Install either if not found
   check_java
   
   # Install the packages in the console_packages array
@@ -182,11 +191,6 @@ function main() {
   # If the console_packages array included pyenv check if it needs to be added to the user's PATH
   if [[ "${console_packages[*]}" =~ "pyenv" ]]; then
     add_pyenv_to_path
-  fi
-
-  # If the user's .{shell}_profile was altered in any way then source the file
-  if (( ${changes_made} )); then
-    source_profile
   fi
 }
 
