@@ -28,7 +28,7 @@ function check_brew() {
 function check_java() {
   # can't be sure associative arrays are available so these two arrays need to match
   java_versions=('Java SE 8' 'Java SE 11')
-  java_packages=('openjdk8' 'openjdk11')
+  java_packages=('openjdk@8' 'openjdk@11')
   
   installed_javas=$(/usr/libexec/java_home -V 2>&1)
   javas_to_install=()
