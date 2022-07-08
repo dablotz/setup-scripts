@@ -25,28 +25,37 @@ function check_brew() {
 }
 
 # Check if Java 8 and Java 11 are installed and on path
+# Existing 
 function check_java() {
-  # can't be sure associative arrays are available so these two arrays need to match
-  java_versions=('Java SE 8' 'Java SE 11')
   java_packages=('openjdk@8' 'openjdk@11')
   javas_to_install=()
   
   if command -v java >/dev/null 2>&1; then
-    javas_to_install=${java_packages[@]}
+    javas_to_install=('openjdk@8' 'openjdk@11')
   else
     installed_javas=$(/usr/libexec/java_home -V 2>&1)
-    for idx in "${!java_versions[@]}"; do
-      echo idx
-      if [[ "${installed_javas}" =~ "${java_versions[${idx}]}" ]]; then
-        echo "${java_versions[${idx}]} installed"
+
+    if [[ "${installed_javas}" =~ "Java SE 8" ]]; then
+      if [[ "${installed_javas}" =~ "Open JDK 8" ]]; then
+        echo "Java 8 installed"
       else
-        echo "${java_versions[${idx}]} not found"
-        javas_to_install+="${java_packages[${idx}]}"
+        echo "Java 8 not found"
+        javas_to_install+='openjdk@8'
       fi
-    done
+    fi
+    
+    if [[ "${installed_javas}" =~ "Java SE 11" ]]; then
+      if [[ "${installed_javas}" =~ "Open JDK 11" ]]; then
+        echo "Java 11 installed"
+      else
+        echo "Java 11 not found"
+        javas_to_install+='openjdk@11'
+      fi
+    fi
   fi
  
   if (( ${#javas_to_install[@]} > 0 )); then
+    # Making sure the AdoptOpenJdk tap is tapped before potentially installing java versions with brew
     brew tap adoptopenjdk/openjdk
     echo "Java binaries not found. Checking brew cellar for - ${javas_to_install[@]}"
     install_apps "${javas_to_install[@]}"
@@ -133,12 +142,12 @@ function add_java_alias() {
   if [[ ${javas[@]} =~ "8" ]]; then
     echo "Creating symlink for openjdk@8"
     sudo ln -sfn /usr/local/opt/openjdk@8/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-8.jdk
-    printf "export JAVA_8_HOME=\$(/usr/libexec/java_home -v1.8)\nalias java8='export JAVA_HOME=\$JAVA_8_HOME'" >> ${profile}
+    printf "export JAVA_8_HOME=\$(/usr/libexec/java_home -v1.8)\nalias java8='export JAVA_HOME=\$JAVA_8_HOME'\n" >> ${profile}
     source_profile
   fi
   if [[ ${javas[@]} =~ "11" ]]; then
     sudo ln -sfn /usr/local/opt/openjdk@11/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-11.jdk
-    printf "export JAVA_11_HOME=\$(/usr/libexec/java_home -v11)\nalias java11='export JAVA_HOME=\$JAVA_11_HOME'" >> ${profile}
+    printf "export JAVA_11_HOME=\$(/usr/libexec/java_home -v11)\nalias java11='export JAVA_HOME=\$JAVA_11_HOME'\n" >> ${profile}
     source_profile
   fi
 }
