@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#! /usr/bin/env bash -i
 
 set -o errexit
 set -o pipefail
@@ -114,24 +114,22 @@ function install_python() {
 # Updates the user's shell profile file to include pyenv
 function add_pyenv_to_path() {
   # Check if the pyenv root exists in the PATH environment variable.
-  # If it does not then add an export PATH command to .{shell}_profile
+  # If it does not then add an export PATH command to ${profile}
   if [[ -n ${PATH} ]]; then
     pyenv_root=$(pyenv root)
     export_string="\$(pyenv root)/shims:"
 
     if [[ ! ${PATH} =~ "pyenv" ]]; then
       echo "Adding export PATH command to ${profile}"
-      printf "export PATH=${export_string}\$PATH\n" >> ${profile} 
-      source_profile
+      printf "export PATH=${export_string}\$PATH\n" >> ${profile}
     fi
   fi
 
-  # Check if the pyenv snippet already exists in .{shell}_profile
+  # Check if the pyenv snippet already exists in ${profile}
   # Add it to the file if not.
   if [[ -z "$(grep 'command -v pyenv' ${profile})" ]]; then
     echo "Adding pyenv snippet to ${profile}"
     printf "if command -v pyenv 1>/dev/null 2>&1; then\n  eval \"\$(pyenv init -)\"\nfi\n" >> ${profile}
-    source_profile
   fi  
 }
 
@@ -139,16 +137,16 @@ function add_pyenv_to_path() {
 function add_java_alias() {
   javas=("$@")
   
+  # Need to add handling in here to check for the symlinks and aliases before writing them in
   if [[ ${javas[@]} =~ "8" ]]; then
     echo "Creating symlink for openjdk@8"
     sudo ln -sfn /usr/local/opt/openjdk@8/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-8.jdk
     printf "export JAVA_8_HOME=\$(/usr/libexec/java_home -v1.8)\nalias java8='export JAVA_HOME=\$JAVA_8_HOME'\n" >> ${profile}
-    source_profile
   fi
   if [[ ${javas[@]} =~ "11" ]]; then
+  echo "Creating symlink for openjdk@11"
     sudo ln -sfn /usr/local/opt/openjdk@11/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-11.jdk
     printf "export JAVA_11_HOME=\$(/usr/libexec/java_home -v11)\nalias java11='export JAVA_HOME=\$JAVA_11_HOME'\n" >> ${profile}
-    source_profile
   fi
 }
 
@@ -160,10 +158,14 @@ function check_command() {
 # Determine the dot file to use for adding aliases and export PATH commands
 function get_user_shell_profle() {
   # Check for the SHELL environment variable. This is the user's default shell
-  # If SHELL is populated use that to set the .{shell}_profile file to use below
+  # If SHELL is populated use that to set the dot file to use below
   # If SHELL is empty use .bash_profile
   if [[ -n ${SHELL} ]]; then
-    profile="${HOME}/.${SHELL##*/}_profile"
+    if [[ ${SHELL} =~ "zsh" ]]; then
+      profile="${HOME}/.zprofile"
+    else
+      profile="${HOME}/.bash_profile"
+    fi
   else
     profile="${HOME}/.bash_profile"
   fi
@@ -172,14 +174,7 @@ function get_user_shell_profle() {
   if [[ ! -f ${profile} ]]; then
     echo "${profile} does not exist. Creating ${profile}"
     touch ${profile}
-    source_profile
   fi
-}
-
-# Source user's dot profile file
-function source_profile() {
-  echo "Sourcing ${profile}"
-  source ${profile}
 }
 
 function main() {
@@ -210,6 +205,11 @@ function main() {
   if [[ "${console_packages[*]}" =~ "pyenv" ]]; then
     add_pyenv_to_path
   fi
+
+  # Source the user's profile after script has run
+  source ${profile}
+
+  # Print out any manual steps that need to happen.
 }
 
 main "${0}"
