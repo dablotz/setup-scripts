@@ -29,22 +29,28 @@ function check_java() {
   # can't be sure associative arrays are available so these two arrays need to match
   java_versions=('Java SE 8' 'Java SE 11')
   java_packages=('openjdk@8' 'openjdk@11')
-  
-  installed_javas=$(/usr/libexec/java_home -V 2>&1)
   javas_to_install=()
-
-  for idx in "${!java_versions[@]}"; do
-    if [[ "${installed_javas}" =~ "${java_versions[${idx}]}" ]]; then
-      echo "${java_versions[${idx}]} installed"
-    else
-      echo "${java_versions[${idx}]} not found"
-      javas_to_install+="${java_packages[${idx}]}"
-    fi
-  done
-
+  
+  if command -v java >/dev/null 2>&1; then
+    javas_to_install=${java_packages[@]}
+  else
+    installed_javas=$(/usr/libexec/java_home -V 2>&1)
+    for idx in "${!java_versions[@]}"; do
+      echo idx
+      if [[ "${installed_javas}" =~ "${java_versions[${idx}]}" ]]; then
+        echo "${java_versions[${idx}]} installed"
+      else
+        echo "${java_versions[${idx}]} not found"
+        javas_to_install+="${java_packages[${idx}]}"
+      fi
+    done
+  fi
+ 
   if (( ${#javas_to_install[@]} > 0 )); then
+    brew tap adoptopenjdk/openjdk
     echo "Java binaries not found. Checking brew cellar for - ${javas_to_install[@]}"
     install_apps "${javas_to_install[@]}"
+    echo "Adding Java aliases"
     add_java_alias "${javas_to_install[@]}"
   else
     echo "No Java versions will be installed"
@@ -104,7 +110,7 @@ function add_pyenv_to_path() {
     pyenv_root=$(pyenv root)
     export_string="\$(pyenv root)/shims:"
 
-    if [[ ! "${PATH}" =~ "${pyenv_root}/shims" ]]; then
+    if [[ ! ${PATH} =~ "pyenv" ]]; then
       echo "Adding export PATH command to ${profile}"
       printf "export PATH=${export_string}\$PATH\n" >> ${profile} 
       source_profile
@@ -122,13 +128,16 @@ function add_pyenv_to_path() {
 
 # Adds java alias to user's .{shell}_profile file
 function add_java_alias() {
-  javas = ("$@")
+  javas=("$@")
   
-  if [[ "8" =~ javas ]]; then
+  if [[ ${javas[@]} =~ "8" ]]; then
+    echo "Creating symlink for openjdk@8"
+    sudo ln -sfn /usr/local/opt/openjdk@8/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-8.jdk
     printf "export JAVA_8_HOME=\$(/usr/libexec/java_home -v1.8)\nalias java8='export JAVA_HOME=\$JAVA_8_HOME'" >> ${profile}
     source_profile
   fi
-  if [[ "11" =~ javas ]]; then
+  if [[ ${javas[@]} =~ "11" ]]; then
+    sudo ln -sfn /usr/local/opt/openjdk@11/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-11.jdk
     printf "export JAVA_11_HOME=\$(/usr/libexec/java_home -v11)\nalias java11='export JAVA_HOME=\$JAVA_11_HOME'" >> ${profile}
     source_profile
   fi
@@ -179,7 +188,7 @@ function main() {
 
   # Check installed Java versions for jdk 8 and jdk 11. Install either if not found
   check_java
-  
+
   # Install the packages in the console_packages array
   install_apps "${console_packages[@]}"
   
