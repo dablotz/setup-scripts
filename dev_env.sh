@@ -24,10 +24,9 @@ function check_brew() {
   fi
 }
 
-# Check if Java 8 and Java 11 are installed and on path
-# Existing 
+# Check if Java 8 and Java 11 are installed
+# Pass uninstalled versions to install_apps to be installed with brew
 function check_java() {
-  java_packages=('openjdk@8' 'openjdk@11')
   javas_to_install=()
   
   if command -v java >/dev/null 2>&1; then
@@ -35,6 +34,8 @@ function check_java() {
   else
     installed_javas=$(/usr/libexec/java_home -V 2>&1)
 
+    # These checks could be teased out into a function
+    # from here
     if [[ "${installed_javas}" =~ "Java SE 8" ]]; then
       if [[ "${installed_javas}" =~ "Open JDK 8" ]]; then
         echo "Java 8 installed"
@@ -52,12 +53,13 @@ function check_java() {
         javas_to_install+='openjdk@11'
       fi
     fi
+    # to here
   fi
  
   if (( ${#javas_to_install[@]} > 0 )); then
-    # Making sure the AdoptOpenJdk tap is tapped before potentially installing java versions with brew
+    # Making sure the AdoptOpenJdk tap is tapped before installing java versions with brew
     brew tap adoptopenjdk/openjdk
-    echo "Java binaries not found. Checking brew cellar for - ${javas_to_install[@]}"
+    echo "Java binaries not found. Using brew to install - ${javas_to_install[@]}"
     install_apps "${javas_to_install[@]}"
     echo "Adding Java aliases"
     add_java_alias "${javas_to_install[@]}"
@@ -133,7 +135,7 @@ function add_pyenv_to_path() {
   fi  
 }
 
-# Adds java alias to user's .{shell}_profile file
+# Adds java alias to ${profile}
 function add_java_alias() {
   javas=("$@")
   
@@ -170,7 +172,7 @@ function get_user_shell_profle() {
     profile="${HOME}/.bash_profile"
   fi
 
-  # Check if .{shell}_profile exists. Create it if not.
+  # Check if ${profile} exists. Create it if not.
   if [[ ! -f ${profile} ]]; then
     echo "${profile} does not exist. Creating ${profile}"
     touch ${profile}
