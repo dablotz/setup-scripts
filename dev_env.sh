@@ -29,36 +29,30 @@ function check_brew() {
 function check_java() {
   javas_to_install=()
   
-  if command -v java >/dev/null 2>&1; then
+  if ! check_command "java"; then
     javas_to_install=('openjdk@8' 'openjdk@11')
   else
     installed_javas=$(/usr/libexec/java_home -V 2>&1)
 
     # These checks could be teased out into a function
     # from here
-    if [[ "${installed_javas}" =~ "Java SE 8" ]]; then
-      if [[ "${installed_javas}" =~ "Open JDK 8" ]]; then
-        echo "Java 8 installed"
-      else
-        echo "Java 8 not found"
-        javas_to_install+='openjdk@8'
-      fi
+    if [[ "${installed_javas}" =~ "Java SE 8" || "${installed_javas}" =~ "Open JDK 8" ]]; then
+      echo "Java 8 installed"
+    else
+      echo "Java 8 not found"
+      javas_to_install+='openjdk@8'
     fi
     
-    if [[ "${installed_javas}" =~ "Java SE 11" ]]; then
-      if [[ "${installed_javas}" =~ "Open JDK 11" ]]; then
-        echo "Java 11 installed"
-      else
-        echo "Java 11 not found"
-        javas_to_install+='openjdk@11'
-      fi
+    if [[ "${installed_javas}" =~ "Java SE 11" || "${installed_javas}" =~ "Open JDK 11" ]]; then
+      echo "Java 11 installed"
+    else
+      echo "Java 11 not found"
+      javas_to_install+='openjdk@11'
     fi
     # to here
   fi
  
   if (( ${#javas_to_install[@]} > 0 )); then
-    # Making sure the AdoptOpenJdk tap is tapped before installing java versions with brew
-    brew tap adoptopenjdk/openjdk
     echo "Java binaries not found. Using brew to install - ${javas_to_install[@]}"
     install_apps "${javas_to_install[@]}"
     echo "Adding Java aliases"
@@ -89,16 +83,6 @@ function install_apps() {
   done
 }
 
-# Checks if the supplied package is in the list of outdated brew formulae and casks
-function is_outdated() {
-  package_name=$@
-  outdated_list=$(brew outdated)
-
-  if [[ ! "${outdated_list}" =~ "${package_name}" ]]; then
-    return 1 # this might be the wrong way to bail if package_name is not in outdated_list
-  fi
-}
-
 # Uses pyenv to install python
 function install_python() {
   if pyenv versions >/dev/null 2>&1; then
@@ -106,10 +90,19 @@ function install_python() {
       echo "python ${python_version} found. Not installing python ${python_version}"
     else
       pyenv install "${python_version}"
-      pyenv global "${python_version}"
     fi
   else
     echo "pyenv unavailable"
+  fi
+}
+
+# Checks if the supplied package is in the list of outdated brew formulae and casks
+function is_outdated() {
+  package_name=$@
+  outdated_list=$(brew outdated)
+
+  if [[ ! "${outdated_list}" =~ "${package_name}" ]]; then
+    return 1 # this might be the wrong way to bail if package_name is not in outdated_list
   fi
 }
 
@@ -139,16 +132,28 @@ function add_pyenv_to_path() {
 function add_java_alias() {
   javas=("$@")
   
-  # Need to add handling in here to check for the symlinks and aliases before writing them in
+  if [[ ${SHELL} =~ "zsh" ]]; then
+    source "${HOME}/.zprofile"
+  fi
+  shopt -s expand_aliases
+
   if [[ ${javas[@]} =~ "8" ]]; then
-    echo "Creating symlink for openjdk@8"
+    # Creating symlink for openjdk@8
     sudo ln -sfn /usr/local/opt/openjdk@8/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-8.jdk
-    printf "export JAVA_8_HOME=\$(/usr/libexec/java_home -v1.8)\nalias java8='export JAVA_HOME=\$JAVA_8_HOME'\n" >> ${profile}
+    
+    if ! check_command "java8"; then
+      echo "Creating alias for java8"
+      printf "alias java8='export JAVA_HOME=$(/usr/libexec/java_home -v 1.8.0)'\n" >> ${profile}
+    fi
   fi
   if [[ ${javas[@]} =~ "11" ]]; then
-  echo "Creating symlink for openjdk@11"
+    # Creating symlink for openjdk@11
     sudo ln -sfn /usr/local/opt/openjdk@11/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-11.jdk
-    printf "export JAVA_11_HOME=\$(/usr/libexec/java_home -v11)\nalias java11='export JAVA_HOME=\$JAVA_11_HOME'\n" >> ${profile}
+    
+    if ! check_command "java11"; then
+      echo "Creating alias for java11"
+      printf "alias java11='export JAVA_HOME=$(/usr/libexec/java_home -v 11)'\n" >> ${profile}
+    fi
   fi
 }
 
@@ -162,12 +167,8 @@ function get_user_shell_profle() {
   # Check for the SHELL environment variable. This is the user's default shell
   # If SHELL is populated use that to set the dot file to use below
   # If SHELL is empty use .bash_profile
-  if [[ -n ${SHELL} ]]; then
-    if [[ ${SHELL} =~ "zsh" ]]; then
-      profile="${HOME}/.zprofile"
-    else
-      profile="${HOME}/.bash_profile"
-    fi
+  if [[ -n ${SHELL} && ${SHELL} =~ "zsh" ]]; then
+    profile="${HOME}/.zprofile"
   else
     profile="${HOME}/.bash_profile"
   fi
@@ -180,11 +181,11 @@ function get_user_shell_profle() {
 }
 
 function main() {
-  # Command line (console) packages to install with homebrew
+  # Command line packages to install with homebrew
   console_packages=('git' 'pyenv' 'maven@3.5')
   
   # Python version string - (optional) leave blank to skip install of python
-  python_version='3.9.10'
+  python_version='3.9.13'
   
   # Determine the .{shell}_profile file to use for configuration (.bash_profile, .zsh_profile, etc.)
   get_user_shell_profle
@@ -208,10 +209,8 @@ function main() {
     add_pyenv_to_path
   fi
 
-  # Source the user's profile after script has run
-  source ${profile}
-
   # Print out any manual steps that need to happen.
+  printf "Commands to be run manually:\n    source ${profile}\n    pyenv global ${python_version}\n"
 }
 
 main "${0}"
