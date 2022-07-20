@@ -181,10 +181,20 @@ function get_user_shell_profle() {
 }
 
 function main() {
+  # Trying to make this too generic. We know what tools we need to install so stop trying to be cute.
+  # brew then git, pyenv, aws-iamauthenticator, kubectl, and maven@3.5 with brew
+  # install java binaries as someone would download them from the website
+  # https://apple.stackexchange.com/questions/276772/how-to-install-java-using-terminal
+  # aws-cli has instructions for using curl and a built in installer 
+  # brew annoyingly installs a version of python listed as a dependency even if the version is already on the systen
+  
+  # need functions to write/copy config files to the appropriate directories
+  # brew cask installs for gui apps?
+  
   # Command line packages to install with homebrew
   console_packages=('git' 'pyenv' 'maven@3.5')
   
-  # Python version string - (optional) leave blank to skip install of python
+  # Python version string
   python_version='3.9.13'
   
   # Determine the .{shell}_profile file to use for configuration (.bash_profile, .zsh_profile, etc.)
@@ -199,16 +209,12 @@ function main() {
   # Install the packages in the console_packages array
   install_apps "${console_packages[@]}"
   
-  # Supplying a python version is optional. Skip install_python if string is empty
-  if [[ -n ${python_version} ]]; then
-    install_python
-  fi
+  # Use pyenv to install $python_version
+  install_python  
   
-  # If the console_packages array included pyenv check if it needs to be added to the user's PATH
-  if [[ "${console_packages[*]}" =~ "pyenv" ]]; then
-    add_pyenv_to_path
-  fi
-
+  # Make sure the shims directory for pyenv gets into the user's $PATH
+  add_pyenv_to_path
+  
   # Print out any manual steps that need to happen.
   printf "Commands to be run manually:\n    source ${profile}\n    pyenv global ${python_version}\n"
 }
