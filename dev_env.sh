@@ -41,14 +41,18 @@ function check_java() {
       echo "Java 8 installed"
     else
       echo "Java 8 not found"
-      javas_to_install+='openjdk@8'
+      javas_to_install=('openjdk@8')
     fi
     
     if [[ "${installed_javas}" =~ "Java SE 11" || "${installed_javas}" =~ "openjdk@11" ]]; then
       echo "Java 11 installed"
     else
       echo "Java 11 not found"
-      javas_to_install+='openjdk@11'
+      if (( #${javas_to_install[@]} > 0 )); then
+        javas_to_install=('openjdk@8' 'openjdk@11')
+      else 
+        javas_to_install=('openjdk@11')
+      fi
     fi
     # to here
   fi
@@ -95,6 +99,23 @@ function install_apps() {
       brew install ${package}
     fi
   done
+}
+
+# Install GUI based apps with brew
+# Some packages have both a command line forumlae and cask
+# adding the --cask flag will make certain the cask is installed
+function install_casks() {
+  cask_names=("$@")
+  casks_to_install=()
+
+  # Copy cask_names into a new array and prepend --cask
+  for name in "${cask_names[@]}"; do
+    casks_to_install+=("--cask ${name}")
+  done
+
+  # Pass the newly populated array to install_apps
+  install_apps "${casks_to_install[@]}"
+
 }
 
 # Uses pyenv to install python
@@ -199,7 +220,7 @@ function main() {
   console_packages=('git' 'pyenv' 'maven@3.5' 'aws-iam-authenticator' 'kubectl')
   
   # Gui packages
-  cask_packages=('--cask intellij-idea' '--cask insomnia')
+  cask_packages=('intellij-idea' 'insomnia' 'sourcetree')
 
   # Python version string
   python_version='3.9.13'
@@ -220,7 +241,7 @@ function main() {
   install_apps "${console_packages[@]}"
 
   # Install the gui packages (casks)
-  install_apps "${cask_packages[@]}"
+  install_casks "${cask_packages[@]}"
   
   # Use pyenv to install $python_version
   install_python  
