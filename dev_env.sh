@@ -33,17 +33,18 @@ function check_java() {
     javas_to_install=('openjdk@8' 'openjdk@11')
   else
     installed_javas=$(/usr/libexec/java_home -V 2>&1)
+    echo ${installed_javas[@]}
 
     # These checks could be teased out into a function
     # from here
-    if [[ "${installed_javas}" =~ "Java SE 8" || "${installed_javas}" =~ "Open JDK 8" ]]; then
+    if [[ "${installed_javas}" =~ "Java SE 8" || "${installed_javas}" =~ 'openjdk@8' ]]; then
       echo "Java 8 installed"
     else
       echo "Java 8 not found"
       javas_to_install+='openjdk@8'
     fi
     
-    if [[ "${installed_javas}" =~ "Java SE 11" || "${installed_javas}" =~ "Open JDK 11" ]]; then
+    if [[ "${installed_javas}" =~ "Java SE 11" || "${installed_javas}" =~ "openjdk@11" ]]; then
       echo "Java 11 installed"
     else
       echo "Java 11 not found"
@@ -59,6 +60,19 @@ function check_java() {
     add_java_alias "${javas_to_install[@]}"
   else
     echo "No Java versions will be installed"
+  fi
+}
+
+# Downloads the aws-cli binary from amazon and installs it.
+function check_aws() {
+  if ! check_command 'aws --version'; then
+    echo "aws-cli not found. Downloading aws-cli from https://awscli.amazonaws.com"
+    if ! curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"; then
+      echo "Unable to download aws-cli"
+    else
+      echo "Installing downloaded package for aws-cli"
+      sudo installer -pkg AWSCLIV2.pkg -target /
+    fi
   fi
 }
 
@@ -181,23 +195,16 @@ function get_user_shell_profle() {
 }
 
 function main() {
-  # Trying to make this too generic. We know what tools we need to install so stop trying to be cute.
-  # brew then git, pyenv, aws-iamauthenticator, kubectl, and maven@3.5 with brew
-  # install java binaries as someone would download them from the website
-  # https://apple.stackexchange.com/questions/276772/how-to-install-java-using-terminal
-  # aws-cli has instructions for using curl and a built in installer 
-  # brew annoyingly installs a version of python listed as a dependency even if the version is already on the systen
-  
-  # need functions to write/copy config files to the appropriate directories
-  # brew cask installs for gui apps?
-  
   # Command line packages to install with homebrew
-  console_packages=('git' 'pyenv' 'maven@3.5')
+  console_packages=('git' 'pyenv' 'maven@3.5' 'aws-iam-authenticator' 'kubectl')
   
+  # Gui packages
+  cask_packages=('--cask intellij-idea' '--cask insomnia')
+
   # Python version string
   python_version='3.9.13'
   
-  # Determine the .{shell}_profile file to use for configuration (.bash_profile, .zsh_profile, etc.)
+  # Determine the .{shell}_profile file to use for configuration (.bash_profile, .zprofile, etc.)
   get_user_shell_profle
   
   # Check on brew - install if necessary
@@ -206,8 +213,14 @@ function main() {
   # Check installed Java versions for jdk 8 and jdk 11. Install either if not found
   check_java
 
+  # Check for aws-cli and install if needed
+  check_aws
+
   # Install the packages in the console_packages array
   install_apps "${console_packages[@]}"
+
+  # Install the gui packages (casks)
+  install_apps "${cask_packages[@]}"
   
   # Use pyenv to install $python_version
   install_python  
