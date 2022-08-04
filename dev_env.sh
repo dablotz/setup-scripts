@@ -71,11 +71,16 @@ function check_java() {
 function check_aws() {
   if ! check_command 'aws --version'; then
     echo "aws-cli not found. Downloading aws-cli from https://awscli.amazonaws.com"
-    if ! curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"; then
+    if ! curl "https://s3.amazonaws.com/aws-cli/awscli-bundle-1.22.2.zip" -o "awscli-bundle.zip"; then
       echo "Unable to download aws-cli"
     else
       echo "Installing downloaded package for aws-cli"
-      sudo installer -pkg AWSCLIV2.pkg -target /
+      unzip awscli-bundle.zip
+      sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws
+      
+      # clean up after the install
+      rm -rf awscli-bundle
+      rm awscli-bundle.zip
     fi
   fi
 }
@@ -234,9 +239,6 @@ function main() {
   # Check installed Java versions for jdk 8 and jdk 11. Install either if not found
   check_java
 
-  # Check for aws-cli and install if needed
-  check_aws
-
   # Install the packages in the console_packages array
   install_apps "${console_packages[@]}"
 
@@ -248,9 +250,15 @@ function main() {
   
   # Make sure the shims directory for pyenv gets into the user's $PATH
   add_pyenv_to_path
-  
-  # Print out any manual steps that need to happen.
-  printf "Commands to be run manually:\n    source ${profile}\n    pyenv global ${python_version}\n"
+
+  # Almost done with installs. set the pyenv global version then install aws-cli
+  source "${profile}"
+  pyenv global "${python_version}"
+
+  # Check for aws-cli and install if needed. aws-cli install happens last on purpose
+  # Whichever version of Python is the default Python will be used to install the aws-cli
+  # Out of the box this will fail because the version of Python on Mac OS (2.7) is incompatible with aws-cli
+  check_aws
 }
 
 main "${0}"
