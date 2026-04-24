@@ -165,6 +165,10 @@ brew_install() {
 
 brew_cask_install() {
   local pkg="$1"
+  if [[ "$OS" == "linux" ]]; then
+    warn "Skipping cask '$pkg' — brew casks are macOS only"
+    return
+  fi
   if [[ "$DRY_RUN" == true ]]; then log "[dry-run] would install $pkg via brew cask"; return; fi
   if brew list --cask "$pkg" >/dev/null 2>&1; then
     if brew outdated --cask | grep -q "^${pkg}"; then
@@ -207,6 +211,19 @@ pyenv_install() {
   fi
 }
 
+npm_install() {
+  local pkg="$1"
+  if [[ "$DRY_RUN" == true ]]; then log "[dry-run] would install $pkg via npm"; return; fi
+  local nvm_dir="${NVM_DIR:-$HOME/.nvm}"
+  if [[ -s "$nvm_dir/nvm.sh" ]]; then
+    # shellcheck source=/dev/null
+    \. "$nvm_dir/nvm.sh"
+  fi
+  command_exists npm || die "npm not found — ensure a Node version is installed before using method: npm"
+  log "Installing $pkg via npm"
+  npm install -g "$pkg"
+}
+
 nvm_install() {
   local version="$1" extra="${2:-}"
   if [[ "$DRY_RUN" == true ]]; then log "[dry-run] would install Node $version via nvm${extra:+ ($extra)}"; return; fi
@@ -247,6 +264,7 @@ process_packages() {
       brew)        brew_install "$name" ;;
       brew_cask)   brew_cask_install "$name" ;;
       curl_script) curl_script_install "$name" "${extra:-}" ;;
+      npm)         npm_install "$name" ;;
       pyenv)       pyenv_install "$name" "${extra:-}" ;;
       nvm)         nvm_install "$name" "${extra:-}" ;;
       *) warn "Unknown method '$method' for '$name' — skipping" ;;

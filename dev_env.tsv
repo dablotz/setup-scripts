@@ -2,8 +2,9 @@
 # Columns are tab-separated. Do not use leading/trailing spaces around values.
 #
 # [packages] columns:  name  method  extra
-#   method: brew | brew_cask | curl_script | pyenv | nvm
+#   method: brew | brew_cask | curl_script | npm | pyenv | nvm
 #   extra:  url (required for curl_script) | global (pyenv) | default (nvm)
+#   note:   brew_cask is macOS only — entries are skipped on Linux
 #
 # [profile] columns:  type  key  value
 #   type: export | path | alias | line
@@ -19,6 +20,7 @@ pyenv	brew
 3.11.9	pyenv	global
 nvm	curl_script	https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh
 20	nvm	default
+@anthropic-ai/claude-code	npm
 visual-studio-code	brew_cask
 
 [profile]

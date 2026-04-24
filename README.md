@@ -36,12 +36,13 @@ Columns: `name`, `method`, `extra`
 | method | what it does | `extra` |
 |--------|-------------|---------|
 | `brew` | `brew install <name>` | — |
-| `brew_cask` | `brew install --cask <name>` | — |
+| `brew_cask` | `brew install --cask <name>` (macOS only — skipped on Linux) | — |
 | `curl_script` | downloads and pipes to bash | URL (required) |
+| `npm` | `npm install -g <name>` | — |
 | `pyenv` | `pyenv install <version>` | `global` — sets as pyenv global |
 | `nvm` | `nvm install <version>` | `default` — sets as nvm default |
 
-**Order matters**: `pyenv` must appear before any `pyenv` version entries; the `nvm` curl_script entry must appear before any `nvm` version entries.
+**Order matters**: `pyenv` must appear before any `pyenv` version entries; the `nvm` curl_script entry must appear before any `nvm` version entries; any `npm` entries must appear after the `nvm` version entry that provides npm.
 
 ### `[profile]`
 
