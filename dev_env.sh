@@ -87,6 +87,37 @@ detect_profile() {
   fi
 }
 
+# ── Linux prerequisites ────────────────────────────────────────────────────────
+bootstrap_linux_deps() {
+  [[ "$OS" == "linux" ]] || return 0
+
+  local pm=""
+  if   command_exists apt-get; then pm="apt-get"
+  elif command_exists dnf;     then pm="dnf"
+  elif command_exists yum;     then pm="yum"
+  elif command_exists pacman;  then pm="pacman"
+  else die "No supported package manager found (apt-get, dnf, yum, pacman) — cannot install Homebrew prerequisites"; fi
+
+  if [[ "$DRY_RUN" == true ]]; then
+    log "[dry-run] would install Homebrew prerequisites via $pm if any of: curl git gcc file are missing"
+    return
+  fi
+
+  # Only call sudo if something is actually missing
+  if command_exists curl && command_exists git && command_exists gcc && command_exists file; then
+    log "Linux prerequisites already satisfied"
+    return
+  fi
+
+  log "Installing Homebrew prerequisites via $pm..."
+  case "$pm" in
+    apt-get) sudo apt-get update -qq && sudo apt-get install -y build-essential curl file git ;;
+    dnf)     sudo dnf install -y gcc make curl file git ;;
+    yum)     sudo yum install -y gcc make curl file git ;;
+    pacman)  sudo pacman -Sy --noconfirm base-devel curl file git ;;
+  esac
+}
+
 # ── Homebrew bootstrap ─────────────────────────────────────────────────────────
 bootstrap_brew() {
   if [[ "$DRY_RUN" == true ]]; then
@@ -253,6 +284,7 @@ main() {
   parse_args "$@"
   detect_os
   detect_profile
+  bootstrap_linux_deps
   bootstrap_brew
   process_packages
   write_shell_profile
