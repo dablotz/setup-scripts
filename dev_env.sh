@@ -273,12 +273,12 @@ process_packages() {
 }
 
 write_shell_profile() {
-  local section="" type key value raw sep=$'\x01'
+  local section="" type key value os_filter raw sep=$'\x01'
   log "Writing profile entries to $PROFILE_FILE"
 
   while IFS= read -r raw || [[ -n "$raw" ]]; do
     [[ "$raw" =~ ^[[:space:]]*# || -z "${raw// }" ]] && continue
-    IFS="$sep" read -r type key value <<< "${raw//$'\t'/$sep}"
+    IFS="$sep" read -r type key value os_filter <<< "${raw//$'\t'/$sep}"
 
     if [[ "$type" =~ ^\[ ]]; then
       section="$type"
@@ -286,6 +286,7 @@ write_shell_profile() {
     fi
     [[ "$section" == "[profile]" ]] || continue
     [[ "$type" == "type" ]] && continue  # skip header row
+    [[ -n "$os_filter" && "$os_filter" != "$OS" ]] && continue
 
     case "$type" in
       export) append_to_profile "export ${key}=${value}" ;;

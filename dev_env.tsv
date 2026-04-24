@@ -6,8 +6,9 @@
 #   extra:  url (required for curl_script) | global (pyenv) | default (nvm)
 #   note:   brew_cask is macOS only — entries are skipped on Linux
 #
-# [profile] columns:  type  key  value
+# [profile] columns:  type  key  value  os
 #   type: export | path | alias | line
+#   os:   mac | linux | (blank = all platforms)
 #   export → export KEY=VALUE
 #   path   → export PATH="VALUE:$PATH"   (key column unused)
 #   alias  → alias key='value'
@@ -24,9 +25,9 @@ nvm	curl_script	https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh
 visual-studio-code	brew_cask
 
 [profile]
-type	key	value
+type	key	value	os
 export	NVM_DIR	$HOME/.nvm
-export	EDITOR	code --wait
+export	EDITOR	code --wait	mac
 path		$HOME/.local/bin
 alias	ll	ls -la
 alias	gs	git status
