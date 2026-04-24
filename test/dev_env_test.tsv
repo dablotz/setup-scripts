@@ -1,0 +1,14 @@
+# Minimal config for container-based testing.
+# Keeps install time short — skips pyenv and nvm.
+# Validates: brew bootstrap, brew install, profile writing.
+
+[packages]
+name	method	extra
+tree	brew
+
+[profile]
+type	key	value
+export	DEV_ENV_TEST	verified
+path		$HOME/.local/bin
+alias	ll	ls -la
+line		# installed by dev_env test run

@@ -1,0 +1,33 @@
+# dev_env.tsv — developer environment configuration
+# Columns are tab-separated. Do not use leading/trailing spaces around values.
+#
+# [packages] columns:  name  method  extra
+#   method: brew | brew_cask | curl_script | pyenv | nvm
+#   extra:  url (required for curl_script) | global (pyenv) | default (nvm)
+#
+# [profile] columns:  type  key  value
+#   type: export | path | alias | line
+#   export → export KEY=VALUE
+#   path   → export PATH="VALUE:$PATH"   (key column unused)
+#   alias  → alias key='value'
+#   line   → verbatim line appended as-is (key column unused)
+
+[packages]
+name	method	extra
+git	brew
+pyenv	brew
+3.11.9	pyenv	global
+nvm	curl_script	https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh
+20	nvm	default
+visual-studio-code	brew_cask
+
+[profile]
+type	key	value
+export	NVM_DIR	$HOME/.nvm
+export	EDITOR	code --wait
+path		$HOME/.local/bin
+alias	ll	ls -la
+alias	gs	git status
+line		[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+line		[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+line		if command -v pyenv 1>/dev/null 2>&1; then eval "$(pyenv init -)"; fi

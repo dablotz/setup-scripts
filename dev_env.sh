@@ -1,264 +1,266 @@
-#! /usr/bin/env bash -i
+#!/usr/bin/env bash
 
-set -o errexit
-set -o pipefail
+set -euo pipefail
 
-profile=""
+# ── Defaults ───────────────────────────────────────────────────────────────────
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="${SCRIPT_DIR}/dev_env.tsv"
+PROFILE_FILE=""
+OS=""
+DRY_RUN=false
 
-# Check if homebrew (brew) is installed
-# If yes update brew, otherwise install from the internet
-function check_brew() {
-  if check_command "brew"; then
-    echo "Brew found. Updating brew"
-    if ! brew update; then
-      echo "Unable to update brew. Exiting"
-      return 1
-    fi
-  else
-    if /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; then
-      echo "Brew installed. Continuing to packages"
-    else
-      echo "Unable to install brew. Exiting"
-      return 1
-    fi
+# ── Logging ────────────────────────────────────────────────────────────────────
+log()  { printf '[dev_env] %s\n' "$*"; }
+warn() { printf '[dev_env] WARN: %s\n' "$*" >&2; }
+die()  { printf '[dev_env] ERROR: %s\n' "$*" >&2; exit 1; }
+
+# ── Utilities ──────────────────────────────────────────────────────────────────
+command_exists() { command -v "$1" >/dev/null 2>&1; }
+
+append_to_profile() {
+  local line="$1"
+  if [[ "$DRY_RUN" == true ]]; then
+    log "[dry-run] would append to ${PROFILE_FILE}: ${line}"
+    return
+  fi
+  if ! grep -qF "$line" "$PROFILE_FILE" 2>/dev/null; then
+    log "  → ${PROFILE_FILE}: ${line}"
+    printf '%s\n' "$line" >> "$PROFILE_FILE"
   fi
 }
 
-# Check if Java 8 and Java 11 are installed
-# Pass uninstalled versions to install_apps to be installed with brew
-function check_java() {
-  javas_to_install=()
-  
-  if ! check_command "java"; then
-    javas_to_install=('openjdk@8' 'openjdk@11')
-  else
-    installed_javas=$(/usr/libexec/java_home -V 2>&1)
-    echo ${installed_javas[@]}
+# ── Argument parsing ───────────────────────────────────────────────────────────
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") [OPTIONS]
 
-    # These checks could be teased out into a function
-    # from here
-    if [[ "${installed_javas}" =~ "Java SE 8" || "${installed_javas}" =~ 'openjdk@8' ]]; then
-      echo "Java 8 installed"
-    else
-      echo "Java 8 not found"
-      javas_to_install=('openjdk@8')
-    fi
-    
-    if [[ "${installed_javas}" =~ "Java SE 11" || "${installed_javas}" =~ "openjdk@11" ]]; then
-      echo "Java 11 installed"
-    else
-      echo "Java 11 not found"
-      if (( #${javas_to_install[@]} > 0 )); then
-        javas_to_install=('openjdk@8' 'openjdk@11')
-      else 
-        javas_to_install=('openjdk@11')
-      fi
-    fi
-    # to here
-  fi
- 
-  if (( ${#javas_to_install[@]} > 0 )); then
-    echo "Java binaries not found. Using brew to install - ${javas_to_install[@]}"
-    install_apps "${javas_to_install[@]}"
-    echo "Adding Java aliases"
-    add_java_alias "${javas_to_install[@]}"
-  else
-    echo "No Java versions will be installed"
-  fi
+  -c, --config  <file>   Config TSV file (default: dev_env.tsv)
+  -p, --profile <file>   Shell profile to update (auto-detected if omitted)
+  -n, --dry-run          Log actions without installing anything or writing to the profile
+  -h, --help             Show this help
+EOF
 }
 
-# Downloads the aws-cli binary from amazon and installs it.
-function check_aws() {
-  if ! check_command 'aws --version'; then
-    echo "aws-cli not found. Downloading aws-cli from https://awscli.amazonaws.com"
-    if ! curl "https://s3.amazonaws.com/aws-cli/awscli-bundle-1.22.2.zip" -o "awscli-bundle.zip"; then
-      echo "Unable to download aws-cli"
-    else
-      echo "Installing downloaded package for aws-cli"
-      unzip awscli-bundle.zip
-      sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws
-      
-      # clean up after the install
-      rm -rf awscli-bundle
-      rm awscli-bundle.zip
-    fi
-  fi
-}
-
-# Uses homebrew to install command line apps
-function install_apps() {
-  to_be_installed=("$@")
-
-  # Loop over array of packages to see if they are installed and up to date
-  # Install or update packages as needed
-  for package in "${to_be_installed[@]}"; do
-    if brew list ${package} >/dev/null 2>&1; then
-      echo "Brew has already installed ${package}. Checking that ${package} is up to date."
-      if is_outdated "${package}"; then
-        brew upgrade ${package}
-      else
-        echo "${package} is up to date."
-      fi
-    else
-      echo "Brew cannot find ${package}. Installing ${package}"
-      brew install ${package}
-    fi
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -c|--config)  CONFIG_FILE="$2"; shift 2 ;;
+      -p|--profile) PROFILE_FILE="$2"; shift 2 ;;
+      -n|--dry-run) DRY_RUN=true; shift ;;
+      -h|--help)    usage; exit 0 ;;
+      *) die "Unknown option: $1" ;;
+    esac
   done
+  [[ -f "$CONFIG_FILE" ]] || die "Config file not found: $CONFIG_FILE"
 }
 
-# Install GUI based apps with brew
-# Some packages have both a command line forumlae and cask
-# adding the --cask flag will make certain the cask is installed
-function install_casks() {
-  cask_names=("$@")
-  casks_to_install=()
-
-  # Copy cask_names into a new array and prepend --cask
-  for name in "${cask_names[@]}"; do
-    casks_to_install+=("--cask ${name}")
-  done
-
-  # Pass the newly populated array to install_apps
-  install_apps "${casks_to_install[@]}"
-
+# ── OS detection ───────────────────────────────────────────────────────────────
+detect_os() {
+  case "$(uname -s)" in
+    Darwin) OS="mac" ;;
+    Linux)  OS="linux" ;;
+    *) die "Unsupported OS: $(uname -s)" ;;
+  esac
+  log "Detected OS: $OS"
 }
 
-# Uses pyenv to install python
-function install_python() {
-  if pyenv versions >/dev/null 2>&1; then
-    if [[ -n "$(pyenv versions | grep ${python_version})" ]]; then
-      echo "python ${python_version} found. Not installing python ${python_version}"
+# ── Shell profile ──────────────────────────────────────────────────────────────
+detect_profile() {
+  if [[ -n "$PROFILE_FILE" ]]; then
+    log "Using specified profile: $PROFILE_FILE"
+    return
+  fi
+  case "${SHELL##*/}" in
+    zsh)  PROFILE_FILE="${HOME}/.zprofile" ;;
+    bash) PROFILE_FILE="${HOME}/.bash_profile" ;;
+    fish) PROFILE_FILE="${HOME}/.config/fish/config.fish" ;;
+    *)    PROFILE_FILE="${HOME}/.profile" ;;
+  esac
+  log "Auto-detected profile: $PROFILE_FILE"
+  if [[ ! -f "$PROFILE_FILE" ]]; then
+    if [[ "$DRY_RUN" == true ]]; then
+      log "[dry-run] would create $PROFILE_FILE"
     else
-      pyenv install "${python_version}"
+      log "Creating $PROFILE_FILE"
+      touch "$PROFILE_FILE"
+    fi
+  fi
+}
+
+# ── Homebrew bootstrap ─────────────────────────────────────────────────────────
+bootstrap_brew() {
+  if [[ "$DRY_RUN" == true ]]; then
+    log "[dry-run] would bootstrap Homebrew if not installed"
+    return
+  fi
+  if ! command_exists brew; then
+    log "Installing Homebrew..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
+      || die "Failed to install Homebrew"
+  fi
+
+  # After a fresh install brew may not yet be on PATH — eval shellenv for this session
+  if ! command_exists brew; then
+    if [[ "$OS" == "mac" ]]; then
+      [[ -x /opt/homebrew/bin/brew ]] && eval "$(/opt/homebrew/bin/brew shellenv)"   # Apple Silicon
+      [[ -x /usr/local/bin/brew    ]] && eval "$(/usr/local/bin/brew shellenv)"      # Intel
+    elif [[ "$OS" == "linux" ]]; then
+      [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]] \
+        && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+    fi
+  fi
+
+  command_exists brew || die "brew not found after install — check Homebrew output above"
+  log "Updating Homebrew..."
+  brew update || warn "brew update failed — continuing"
+}
+
+# ── Package installers ─────────────────────────────────────────────────────────
+brew_install() {
+  local pkg="$1"
+  if [[ "$DRY_RUN" == true ]]; then log "[dry-run] would install $pkg via brew"; return; fi
+  if brew list "$pkg" >/dev/null 2>&1; then
+    if brew outdated | grep -q "^${pkg}"; then
+      log "Upgrading $pkg"
+      brew upgrade "$pkg"
+    else
+      log "$pkg already up to date"
     fi
   else
-    echo "pyenv unavailable"
+    log "Installing $pkg"
+    brew install "$pkg"
   fi
 }
 
-# Checks if the supplied package is in the list of outdated brew formulae and casks
-function is_outdated() {
-  package_name=$@
-  outdated_list=$(brew outdated)
-
-  if [[ ! "${outdated_list}" =~ "${package_name}" ]]; then
-    return 1 # this might be the wrong way to bail if package_name is not in outdated_list
-  fi
-}
-
-# Updates the user's shell profile file to include pyenv
-function add_pyenv_to_path() {
-  # Check if the pyenv root exists in the PATH environment variable.
-  # If it does not then add an export PATH command to ${profile}
-  if [[ -n ${PATH} ]]; then
-    pyenv_root=$(pyenv root)
-    export_string="\$(pyenv root)/shims:"
-
-    if [[ ! ${PATH} =~ "pyenv" ]]; then
-      echo "Adding export PATH command to ${profile}"
-      printf "export PATH=${export_string}\$PATH\n" >> ${profile}
+brew_cask_install() {
+  local pkg="$1"
+  if [[ "$DRY_RUN" == true ]]; then log "[dry-run] would install $pkg via brew cask"; return; fi
+  if brew list --cask "$pkg" >/dev/null 2>&1; then
+    if brew outdated --cask | grep -q "^${pkg}"; then
+      log "Upgrading cask $pkg"
+      brew upgrade --cask "$pkg"
+    else
+      log "Cask $pkg already up to date"
     fi
-  fi
-
-  # Check if the pyenv snippet already exists in ${profile}
-  # Add it to the file if not.
-  if [[ -z "$(grep 'command -v pyenv' ${profile})" ]]; then
-    echo "Adding pyenv snippet to ${profile}"
-    printf "if command -v pyenv 1>/dev/null 2>&1; then\n  eval \"\$(pyenv init -)\"\nfi\n" >> ${profile}
-  fi  
-}
-
-# Adds java alias to ${profile}
-function add_java_alias() {
-  javas=("$@")
-  
-  if [[ ${SHELL} =~ "zsh" ]]; then
-    source "${HOME}/.zprofile"
-  fi
-  shopt -s expand_aliases
-
-  if [[ ${javas[@]} =~ "8" ]]; then
-    # Creating symlink for openjdk@8
-    sudo ln -sfn /usr/local/opt/openjdk@8/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-8.jdk
-    
-    if ! check_command "java8"; then
-      echo "Creating alias for java8"
-      printf "alias java8='export JAVA_HOME=$(/usr/libexec/java_home -v 1.8.0)'\n" >> ${profile}
-    fi
-  fi
-  if [[ ${javas[@]} =~ "11" ]]; then
-    # Creating symlink for openjdk@11
-    sudo ln -sfn /usr/local/opt/openjdk@11/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-11.jdk
-    
-    if ! check_command "java11"; then
-      echo "Creating alias for java11"
-      printf "alias java11='export JAVA_HOME=$(/usr/libexec/java_home -v 11)'\n" >> ${profile}
-    fi
-  fi
-}
-
-# Check if a command exists
-function check_command() {
-  command -v $* >/dev/null 2>&1
-}
-
-# Determine the dot file to use for adding aliases and export PATH commands
-function get_user_shell_profle() {
-  # Check for the SHELL environment variable. This is the user's default shell
-  # If SHELL is populated use that to set the dot file to use below
-  # If SHELL is empty use .bash_profile
-  if [[ -n ${SHELL} && ${SHELL} =~ "zsh" ]]; then
-    profile="${HOME}/.zprofile"
   else
-    profile="${HOME}/.bash_profile"
-  fi
-
-  # Check if ${profile} exists. Create it if not.
-  if [[ ! -f ${profile} ]]; then
-    echo "${profile} does not exist. Creating ${profile}"
-    touch ${profile}
+    log "Installing cask $pkg"
+    brew install --cask "$pkg"
   fi
 }
 
-function main() {
-  # Command line packages to install with homebrew
-  console_packages=('git' 'pyenv' 'maven@3.5' 'aws-iam-authenticator' 'kubectl')
-  
-  # Gui packages
-  cask_packages=('intellij-idea' 'insomnia' 'sourcetree')
-
-  # Python version string
-  python_version='3.9.13'
-  
-  # Determine the .{shell}_profile file to use for configuration (.bash_profile, .zprofile, etc.)
-  get_user_shell_profle
-  
-  # Check on brew - install if necessary
-  check_brew
-
-  # Check installed Java versions for jdk 8 and jdk 11. Install either if not found
-  check_java
-
-  # Install the packages in the console_packages array
-  install_apps "${console_packages[@]}"
-
-  # Install the gui packages (casks)
-  install_casks "${cask_packages[@]}"
-  
-  # Use pyenv to install $python_version
-  install_python  
-  
-  # Make sure the shims directory for pyenv gets into the user's $PATH
-  add_pyenv_to_path
-
-  # Almost done with installs. set the pyenv global version then install aws-cli
-  source "${profile}"
-  pyenv global "${python_version}"
-
-  # Check for aws-cli and install if needed. aws-cli install happens last on purpose
-  # Whichever version of Python is the default Python will be used to install the aws-cli
-  # Out of the box this will fail because the version of Python on Mac OS (2.7) is incompatible with aws-cli
-  check_aws
+curl_script_install() {
+  local name="$1" url="$2"
+  [[ -n "$url" ]] || die "curl_script entry '$name' requires a URL in the extra column"
+  if [[ "$DRY_RUN" == true ]]; then log "[dry-run] would install $name via curl script: $url"; return; fi
+  log "Installing $name via script: $url"
+  curl -fsSL "$url" | bash
 }
 
-main "${0}"
+pyenv_install() {
+  local version="$1" extra="${2:-}"
+  if [[ "$DRY_RUN" == true ]]; then log "[dry-run] would install Python $version via pyenv${extra:+ ($extra)}"; return; fi
+  command_exists pyenv \
+    || die "pyenv not found — add a 'pyenv\tbrew' entry before pyenv version entries"
+  eval "$(pyenv init -)" 2>/dev/null || true
+
+  if pyenv versions --bare | grep -qx "$version"; then
+    log "Python $version already installed"
+  else
+    log "Installing Python $version via pyenv"
+    pyenv install "$version"
+  fi
+
+  if [[ "$extra" == "global" ]]; then
+    log "Setting pyenv global to $version"
+    pyenv global "$version"
+  fi
+}
+
+nvm_install() {
+  local version="$1" extra="${2:-}"
+  if [[ "$DRY_RUN" == true ]]; then log "[dry-run] would install Node $version via nvm${extra:+ ($extra)}"; return; fi
+  local nvm_dir="${NVM_DIR:-$HOME/.nvm}"
+  [[ -s "$nvm_dir/nvm.sh" ]] \
+    || die "nvm not found at $nvm_dir — add a curl_script entry for nvm before nvm version entries"
+  # shellcheck source=/dev/null
+  \. "$nvm_dir/nvm.sh"
+
+  log "Installing Node $version via nvm"
+  nvm install "$version"
+
+  if [[ "$extra" == "default" ]]; then
+    log "Setting nvm default to $version"
+    nvm alias default "$version"
+  fi
+}
+
+# ── Config processing ──────────────────────────────────────────────────────────
+process_packages() {
+  # Use \x01 as split sentinel — tab is IFS whitespace and collapses when consecutive,
+  # which would swallow empty middle columns. \x01 is non-whitespace so it never collapses.
+  local section="" name method extra raw sep=$'\x01'
+  log "Processing packages from $CONFIG_FILE"
+
+  while IFS= read -r raw || [[ -n "$raw" ]]; do
+    [[ "$raw" =~ ^[[:space:]]*# || -z "${raw// }" ]] && continue
+    IFS="$sep" read -r name method extra <<< "${raw//$'\t'/$sep}"
+
+    if [[ "$name" =~ ^\[ ]]; then
+      section="$name"
+      continue
+    fi
+    [[ "$section" == "[packages]" ]] || continue
+    [[ "$name" == "name" ]] && continue  # skip header row
+
+    case "$method" in
+      brew)        brew_install "$name" ;;
+      brew_cask)   brew_cask_install "$name" ;;
+      curl_script) curl_script_install "$name" "${extra:-}" ;;
+      pyenv)       pyenv_install "$name" "${extra:-}" ;;
+      nvm)         nvm_install "$name" "${extra:-}" ;;
+      *) warn "Unknown method '$method' for '$name' — skipping" ;;
+    esac
+  done < "$CONFIG_FILE"
+}
+
+write_shell_profile() {
+  local section="" type key value raw sep=$'\x01'
+  log "Writing profile entries to $PROFILE_FILE"
+
+  while IFS= read -r raw || [[ -n "$raw" ]]; do
+    [[ "$raw" =~ ^[[:space:]]*# || -z "${raw// }" ]] && continue
+    IFS="$sep" read -r type key value <<< "${raw//$'\t'/$sep}"
+
+    if [[ "$type" =~ ^\[ ]]; then
+      section="$type"
+      continue
+    fi
+    [[ "$section" == "[profile]" ]] || continue
+    [[ "$type" == "type" ]] && continue  # skip header row
+
+    case "$type" in
+      export) append_to_profile "export ${key}=${value}" ;;
+      path)   append_to_profile "export PATH=\"${value}:\$PATH\"" ;;
+      alias)  append_to_profile "alias ${key}='${value}'" ;;
+      line)   append_to_profile "${value}" ;;
+      *) warn "Unknown profile type '$type' — skipping" ;;
+    esac
+  done < "$CONFIG_FILE"
+}
+
+# ── Main ───────────────────────────────────────────────────────────────────────
+main() {
+  parse_args "$@"
+  detect_os
+  detect_profile
+  bootstrap_brew
+  process_packages
+  write_shell_profile
+  if [[ "$DRY_RUN" == true ]]; then
+    log "Dry-run complete — no changes were made"
+  else
+    log "Done! Reload your shell or run: source ${PROFILE_FILE}"
+  fi
+}
+
+main "$@"
