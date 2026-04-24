@@ -46,7 +46,7 @@ Columns: `name`, `method`, `extra`
 
 ### `[profile]`
 
-Columns: `type`, `key`, `value`
+Columns: `type`, `key`, `value`, `os` (optional)
 
 | type | written to profile | `key` | `value` |
 |------|-------------------|-------|---------|
@@ -54,6 +54,8 @@ Columns: `type`, `key`, `value`
 | `path` | `export PATH="VALUE:$PATH"` | — | path to prepend |
 | `alias` | `alias key='value'` | alias name | command |
 | `line` | verbatim | — | any shell line |
+
+The optional `os` column limits an entry to a specific platform: `mac` or `linux`. Leave it blank (or omit it) to apply the entry on all platforms.
 
 All profile writes are idempotent — existing lines are never duplicated.
 
@@ -70,9 +72,9 @@ nvm	curl_script	https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh
 visual-studio-code	brew_cask
 
 [profile]
-type	key	value
+type	key	value	os
 export	NVM_DIR	$HOME/.nvm
-export	EDITOR	code --wait
+export	EDITOR	code --wait	mac
 path		$HOME/.local/bin
 alias	ll	ls -la
 line		[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
